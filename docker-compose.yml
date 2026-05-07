@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: biweekly_report_board
+      POSTGRES_USER: report_user
+      POSTGRES_PASSWORD: report_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U report_user -d biweekly_report_board"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_net
+
+  web:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://report_user:report_password@db:5432/biweekly_report_board?schema=public
+      SESSION_SECRET: replace-with-a-long-random-secret
+      ADMIN_EMAIL: admin@example.local
+      ADMIN_INITIAL_PASSWORD: change-me-on-first-login
+      APP_BASE_URL: http://127.0.0.1:3000
+      ALLOWED_IP_RANGES: 127.0.0.1/32
+      TRUSTED_PROXY_IPS: 127.0.0.1
+    ports:
+      - "3000:3000"
+    networks:
+      - app_net
+
+volumes:
+  postgres_data:
+
+networks:
+  app_net:
+    driver: bridge

@@ -1,0 +1,13 @@
+node_modules
+.git
+.next
+out
+.env
+.env.local
+.env.*.local
+.npm-cache
+coverage
+*.log
+*.tsbuildinfo
+docs/*.pdf
+prisma/dev.db
