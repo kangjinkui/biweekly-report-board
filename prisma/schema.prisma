@@ -23,6 +23,7 @@ enum ReportEntryStatus {
 model Team {
   id             String        @id @default(uuid()) @db.Uuid
   name           String
+  departmentName String        @default("도시계획과")
   displayOrder   Int
   isActive       Boolean       @default(true)
   writeTokenHash String        @unique
@@ -31,22 +32,29 @@ model Team {
   updatedAt      DateTime      @updatedAt
 
   @@index([isActive, displayOrder])
+  @@index([departmentName, displayOrder])
 }
 
 model ReportCycle {
-  id             String            @id @default(uuid()) @db.Uuid
-  title          String
-  startDate      DateTime          @db.Date
-  endDate        DateTime          @db.Date
-  dueDate        DateTime          @db.Date
-  status         ReportCycleStatus @default(draft)
-  shareTokenHash String            @unique
-  entries        ReportEntry[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id                String            @id @default(uuid()) @db.Uuid
+  title             String
+  startDate         DateTime          @db.Date
+  endDate           DateTime          @db.Date
+  previousStartDate DateTime          @db.Date
+  previousEndDate   DateTime          @db.Date
+  currentStartDate  DateTime          @db.Date
+  currentEndDate    DateTime          @db.Date
+  dueDate           DateTime          @db.Date
+  status            ReportCycleStatus @default(draft)
+  shareTokenHash    String            @unique
+  entries           ReportEntry[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@index([status, dueDate])
   @@index([startDate, endDate])
+  @@index([previousStartDate, previousEndDate])
+  @@index([currentStartDate, currentEndDate])
 }
 
 model ReportEntry {

@@ -269,4 +269,5 @@ function revalidateAdminPaths(cycleId: string) {
   revalidatePath("/admin/cycles");
   revalidatePath(`/admin/cycles/${cycleId}/status`);
   revalidatePath(`/admin/cycles/${cycleId}/preview`);
+  revalidatePath(`/director/cycles/${cycleId}`);
 }

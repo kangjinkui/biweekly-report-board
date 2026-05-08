@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PrintButton } from "@/components/print-button";
 import { ReportRichText } from "@/components/report-rich-text";
+import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 
 type PreviewPageProps = {
   params: Promise<{
@@ -32,12 +33,14 @@ export default async function CyclePreviewPage({ params }: PreviewPageProps) {
 
   if (!cycle) notFound();
 
+  const periodSummary = formatCyclePeriodSummary(cycle);
+
   return (
-    <main className="mx-auto max-w-4xl bg-white px-8 py-8 print:max-w-none print:px-0">
-      <div className="no-print mb-6 flex items-center justify-between border-b border-[#d6dbe1] pb-4">
+    <main className="gov-page py-6 print:bg-white print:py-0">
+      <div className="no-print gov-container mb-4 flex items-center justify-between">
         <Link
           href="/admin/cycles"
-          className="inline-flex items-center gap-2 text-sm font-medium text-[#2457a7]"
+          className="inline-flex items-center gap-2 text-sm font-medium text-[#005bac]"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
           회차 관리
@@ -45,44 +48,44 @@ export default async function CyclePreviewPage({ params }: PreviewPageProps) {
         <PrintButton />
       </div>
 
-      <article>
-        <header className="border-b-2 border-[#171717] pb-5 text-center">
+      <article className="gov-panel mx-auto max-w-4xl bg-white px-8 py-8 print:max-w-none print:border-0 print:px-0">
+        <header className="border-b-4 border-[#005bac] pb-5 text-center">
           <h1 className="text-3xl font-semibold">{cycle.title}</h1>
           <p className="mt-3 text-sm text-[#344054]">
-            보고 기간: {formatDate(cycle.startDate)} ~ {formatDate(cycle.endDate)}
+            {periodSummary.project}
           </p>
         </header>
 
         <div className="mt-8 space-y-8">
           {cycle.entries.map((entry) => (
             <section key={entry.id}>
-              <div className="mb-3 flex items-center justify-between border-b border-[#171717] pb-2">
-                <h2 className="text-xl font-semibold">{entry.team.name}</h2>
-                <span className="text-sm text-[#344054]">{entryStatusLabel(entry.status)}</span>
+              <div className="flex items-center justify-between border-b-2 border-[#005bac] bg-[#f6f9fc] px-4 py-3">
+                <h2 className="text-xl font-semibold text-[#003f7d]">{entry.team.name}</h2>
+                <span className="border border-[#c8d3df] bg-white px-3 py-1 text-sm text-[#344054]">{entryStatusLabel(entry.status)}</span>
               </div>
               {entry.workItems.length === 0 ? (
-                <p className="mt-4 text-sm text-[#667085]">
+                <p className="border border-t-0 border-[#c8d3df] px-4 py-4 text-sm text-[#667085]">
                   {entry.status === "not_started" ? "작성 전" : "입력된 업무 항목 없음"}
                 </p>
               ) : (
-                <table className="w-full border-collapse text-sm leading-6">
+                <table className="gov-table w-full border-collapse text-sm leading-6">
                   <thead>
                     <tr>
-                      <th className="w-1/2 border border-[#171717] bg-[#f7f8fa] px-3 py-2 text-center font-semibold">
-                        지난 업무 실적
+                      <th className="w-1/2 border px-3 py-2 text-center font-semibold">
+                        {periodSummary.previous}
                       </th>
-                      <th className="w-1/2 border border-[#171717] bg-[#f7f8fa] px-3 py-2 text-center font-semibold">
-                        다음 주 계획
+                      <th className="w-1/2 border px-3 py-2 text-center font-semibold">
+                        {periodSummary.current}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {entry.workItems.map((item) => (
                       <tr key={item.id} className="align-top">
-                        <td className="border border-[#171717] px-3 py-3">
+                        <td className="border px-3 py-3">
                           <ReportCell title={item.title} body={item.description} note={item.note} />
                         </td>
-                        <td className="border border-[#171717] px-3 py-3">
+                        <td className="border px-3 py-3">
                           <ReportCell title={item.title} body={item.nextPlan} />
                         </td>
                       </tr>
@@ -96,10 +99,6 @@ export default async function CyclePreviewPage({ params }: PreviewPageProps) {
       </article>
     </main>
   );
-}
-
-function formatDate(date: Date) {
-  return date.toISOString().slice(0, 10);
 }
 
 function ReportCell({

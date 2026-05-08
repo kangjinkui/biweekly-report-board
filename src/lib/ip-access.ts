@@ -6,6 +6,19 @@ export type IpAccessResult = {
 
 const LOCALHOST_RANGES = ["127.0.0.1/32"];
 
+export function getTrustedProxyIps(): string[] {
+  const raw = process.env.TRUSTED_PROXY_IPS;
+
+  if (!raw || raw.trim().length === 0) {
+    return [];
+  }
+
+  return raw
+    .split(",")
+    .map((ip) => normalizeIp(ip.trim()))
+    .filter((ip): ip is string => Boolean(ip));
+}
+
 export function getAllowedIpRanges(): string[] {
   const raw = process.env.ALLOWED_IP_RANGES;
 
@@ -21,14 +34,22 @@ export function getAllowedIpRanges(): string[] {
 
 export function getClientIpFromHeaders(headers: Headers): string | null {
   const forwardedFor = headers.get("x-forwarded-for");
-  const realIp = headers.get("x-real-ip");
 
   if (forwardedFor) {
-    return normalizeIp(forwardedFor.split(",")[0]?.trim() ?? null);
-  }
+    const forwardedIps = forwardedFor
+      .split(",")
+      .map((ip) => normalizeIp(ip.trim()))
+      .filter((ip): ip is string => Boolean(ip));
+    const trustedProxyIps = getTrustedProxyIps();
+    const lastForwarder = forwardedIps.at(-1);
 
-  if (realIp) {
-    return normalizeIp(realIp.trim());
+    if (
+      forwardedIps.length > 1 &&
+      lastForwarder &&
+      trustedProxyIps.includes(lastForwarder)
+    ) {
+      return forwardedIps[0];
+    }
   }
 
   return null;

@@ -72,6 +72,7 @@ export async function PATCH(request: NextRequest, context: WorkItemRouteContext)
   revalidatePath("/admin/cycles");
   revalidatePath(`/admin/cycles/${parsed.data.cycleId}/status`);
   revalidatePath(`/admin/cycles/${parsed.data.cycleId}/preview`);
+  revalidatePath(`/director/cycles/${parsed.data.cycleId}`);
 
   return NextResponse.json({
     ok: true,

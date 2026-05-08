@@ -21,6 +21,8 @@ type WorkItemEditorProps = {
   teamId: string;
   cycleId: string;
   index: number;
+  previousPeriodLabel: string;
+  currentPeriodLabel: string;
 };
 
 export function WorkItemEditor({
@@ -29,6 +31,8 @@ export function WorkItemEditor({
   teamId,
   cycleId,
   index,
+  previousPeriodLabel,
+  currentPeriodLabel,
 }: WorkItemEditorProps) {
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description);
@@ -107,7 +111,7 @@ export function WorkItemEditor({
       <div className="grid gap-4 md:grid-cols-2">
         <label>
           <span className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold">지난 업무 실적</span>
+            <span className="text-sm font-semibold">{previousPeriodLabel}</span>
             <button
               type="button"
               onClick={() => setTableTarget("description")}
@@ -127,7 +131,7 @@ export function WorkItemEditor({
         </label>
         <label>
           <span className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold">다음 주 계획</span>
+            <span className="text-sm font-semibold">{currentPeriodLabel}</span>
             <button
               type="button"
               onClick={() => setTableTarget("nextPlan")}

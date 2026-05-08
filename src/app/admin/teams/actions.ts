@@ -4,14 +4,17 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createTokenPair } from "@/lib/tokens";
+import { DEPARTMENT_NAMES } from "@/lib/organization";
 
 const teamSchema = z.object({
   name: z.string().trim().min(1, "팀명을 입력하세요.").max(100),
+  departmentName: z.enum(DEPARTMENT_NAMES),
 });
 
 export async function createTeam(formData: FormData) {
   const parsed = teamSchema.safeParse({
     name: formData.get("name"),
+    departmentName: formData.get("departmentName"),
   });
 
   if (!parsed.success) {
@@ -28,6 +31,7 @@ export async function createTeam(formData: FormData) {
   await prisma.team.create({
     data: {
       name: parsed.data.name,
+      departmentName: parsed.data.departmentName,
       displayOrder: (lastTeam?.displayOrder ?? 0) + 1,
       writeTokenHash: token.tokenHash,
     },
@@ -41,6 +45,7 @@ export async function updateTeamName(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const parsed = teamSchema.safeParse({
     name: formData.get("name"),
+    departmentName: formData.get("departmentName"),
   });
 
   if (!id || !parsed.success) {
@@ -49,7 +54,10 @@ export async function updateTeamName(formData: FormData) {
 
   await prisma.team.update({
     where: { id },
-    data: { name: parsed.data.name },
+    data: {
+      name: parsed.data.name,
+      departmentName: parsed.data.departmentName,
+    },
   });
 
   revalidatePath("/admin/teams");
