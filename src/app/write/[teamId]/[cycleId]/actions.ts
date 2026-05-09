@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { normalizeWorkItemType, WORK_ITEM_TYPES } from "@/lib/work-items";
 
 const workItemSchema = z.object({
+  itemType: z.enum(WORK_ITEM_TYPES).default("both"),
   title: z.string().trim().max(200).default(""),
   description: z.string().trim().max(5000).default(""),
   nextPlan: z.string().trim().max(5000).default(""),
@@ -15,6 +17,7 @@ export async function addWorkItem(formData: FormData) {
   const entryId = String(formData.get("entryId") ?? "");
   const teamId = String(formData.get("teamId") ?? "");
   const cycleId = String(formData.get("cycleId") ?? "");
+  const itemType = normalizeWorkItemType(formData.get("itemType"));
 
   if (!entryId || !teamId || !cycleId) return;
 
@@ -28,6 +31,7 @@ export async function addWorkItem(formData: FormData) {
     prisma.workItem.create({
       data: {
         reportEntryId: entryId,
+        itemType,
         title: "",
         description: "",
         nextPlan: "",
@@ -55,6 +59,7 @@ export async function updateWorkItem(formData: FormData) {
   const cycleId = String(formData.get("cycleId") ?? "");
 
   const parsed = workItemSchema.safeParse({
+    itemType: formData.get("itemType") ?? "both",
     title: formData.get("title") ?? "",
     description: formData.get("description") ?? "",
     nextPlan: formData.get("nextPlan") ?? "",
@@ -165,7 +170,24 @@ export async function submitEntry(formData: FormData) {
   const validItems = await prisma.workItem.count({
     where: {
       reportEntryId: entryId,
-      OR: [{ title: { not: "" } }, { description: { not: "" } }],
+      OR: [
+        {
+          itemType: "previous_only",
+          OR: [{ title: { not: "" } }, { description: { not: "" } }],
+        },
+        {
+          itemType: "current_only",
+          OR: [{ title: { not: "" } }, { nextPlan: { not: "" } }],
+        },
+        {
+          itemType: "both",
+          OR: [
+            { title: { not: "" } },
+            { description: { not: "" } },
+            { nextPlan: { not: "" } },
+          ],
+        },
+      ],
     },
   });
 
@@ -224,6 +246,7 @@ export async function copyPreviousEntry(formData: FormData) {
     prisma.workItem.createMany({
       data: previousEntry.workItems.map((item, index) => ({
         reportEntryId: entryId,
+        itemType: item.itemType,
         title: item.title,
         description: item.description,
         nextPlan: item.nextPlan,

@@ -6,12 +6,21 @@ import {
   findFirstMarkdownTable,
   TableEditorModal,
 } from "@/components/table-editor-modal";
+import {
+  normalizeWorkItemType,
+  usesCurrent,
+  usesPrevious,
+  WORK_ITEM_TYPE_LABELS,
+  WORK_ITEM_TYPES,
+  type WorkItemType,
+} from "@/lib/work-items";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 type WorkItemEditorProps = {
   item: {
     id: string;
+    itemType: WorkItemType;
     title: string;
     description: string;
     nextPlan: string;
@@ -34,6 +43,9 @@ export function WorkItemEditor({
   previousPeriodLabel,
   currentPeriodLabel,
 }: WorkItemEditorProps) {
+  const [itemType, setItemType] = useState<WorkItemType>(
+    normalizeWorkItemType(item.itemType),
+  );
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description);
   const [nextPlan, setNextPlan] = useState(item.nextPlan);
@@ -63,6 +75,7 @@ export function WorkItemEditor({
             entryId,
             teamId,
             cycleId,
+            itemType,
             title,
             description,
             nextPlan,
@@ -89,7 +102,10 @@ export function WorkItemEditor({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [cycleId, description, entryId, item.id, nextPlan, note, teamId, title]);
+  }, [cycleId, description, entryId, item.id, itemType, nextPlan, note, teamId, title]);
+
+  const showPrevious = usesPrevious(itemType);
+  const showCurrent = usesCurrent(itemType);
 
   return (
     <div className="grid gap-4">
@@ -99,6 +115,26 @@ export function WorkItemEditor({
           {saveStateLabel(saveState, savedAt)}
         </span>
       </div>
+      <fieldset>
+        <legend className="mb-2 block text-sm font-semibold">작성 유형</legend>
+        <div className="inline-grid grid-cols-3 border border-[#c8d3df] bg-white">
+          {WORK_ITEM_TYPES.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setItemType(type)}
+              className={`px-3 py-2 text-sm font-semibold ${
+                itemType === type
+                  ? "bg-[#005bac] text-white"
+                  : "border-l border-[#c8d3df] text-[#344054] first:border-l-0"
+              }`}
+              aria-pressed={itemType === type}
+            >
+              {WORK_ITEM_TYPE_LABELS[type]}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <label>
         <span className="mb-2 block text-sm font-semibold">업무명</span>
         <input
@@ -108,7 +144,12 @@ export function WorkItemEditor({
           placeholder="예: 양재역세권 활성화사업 지원자문단 회의"
         />
       </label>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div
+        className={`grid gap-4 ${
+          showPrevious && showCurrent ? "md:grid-cols-2" : ""
+        }`}
+      >
+        {showPrevious ? (
         <label>
           <span className="mb-2 flex items-center justify-between gap-3">
             <span className="text-sm font-semibold">{previousPeriodLabel}</span>
@@ -129,6 +170,8 @@ export function WorkItemEditor({
             placeholder={"◦ 일시:\n◦ 장소:\n◦ 주요내용\n- "}
           />
         </label>
+        ) : null}
+        {showCurrent ? (
         <label>
           <span className="mb-2 flex items-center justify-between gap-3">
             <span className="text-sm font-semibold">{currentPeriodLabel}</span>
@@ -149,6 +192,7 @@ export function WorkItemEditor({
             placeholder={"◦ 추진기간:\n◦ 주요내용\n- "}
           />
         </label>
+        ) : null}
       </div>
       <label>
         <span className="mb-2 block text-sm font-semibold">비고</span>

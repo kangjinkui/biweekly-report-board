@@ -2,11 +2,13 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { WORK_ITEM_TYPES } from "@/lib/work-items";
 
 const updateWorkItemSchema = z.object({
   entryId: z.string().uuid(),
   teamId: z.string().uuid(),
   cycleId: z.string().uuid(),
+  itemType: z.enum(WORK_ITEM_TYPES).default("both"),
   title: z.string().trim().max(200).default(""),
   description: z.string().trim().max(5000).default(""),
   nextPlan: z.string().trim().max(5000).default(""),
@@ -47,6 +49,7 @@ export async function PATCH(request: NextRequest, context: WorkItemRouteContext)
     prisma.workItem.update({
       where: { id: itemId },
       data: {
+        itemType: parsed.data.itemType,
         title: parsed.data.title,
         description: parsed.data.description,
         nextPlan: parsed.data.nextPlan,

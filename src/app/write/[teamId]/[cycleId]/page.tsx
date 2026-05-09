@@ -20,6 +20,7 @@ import {
 import { WorkItemEditor } from "./work-item-editor";
 import { formatCyclePeriodSummary, formatKoreanDate } from "@/lib/report-cycle";
 import { PageShell } from "@/components/page-shell";
+import { WORK_ITEM_TYPE_LABELS, WORK_ITEM_TYPES } from "@/lib/work-items";
 
 type WritePageProps = {
   params: Promise<{
@@ -66,10 +67,19 @@ export default async function WritePage({ params }: WritePageProps) {
       <section className="mt-6 flex flex-wrap gap-3">
         <form action={addWorkItem}>
           <HiddenContext entryId={entry.id} teamId={team.id} cycleId={cycle.id} />
-          <button className="gov-action inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold">
-            <Plus className="h-4 w-4" aria-hidden />
-            보고 항목 추가
-          </button>
+          <div className="inline-flex flex-wrap gap-2">
+            {WORK_ITEM_TYPES.map((itemType) => (
+              <button
+                key={itemType}
+                name="itemType"
+                value={itemType}
+                className="gov-action inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
+              >
+                <Plus className="h-4 w-4" aria-hidden />
+                {WORK_ITEM_TYPE_LABELS[itemType]} 추가
+              </button>
+            ))}
+          </div>
         </form>
 
         <form action={copyPreviousEntry}>

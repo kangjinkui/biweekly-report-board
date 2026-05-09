@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "@/components/print-button";
-import { ReportRichText } from "@/components/report-rich-text";
+import { ReportTwoColumnTable } from "@/components/report-two-column-table";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 import { prisma } from "@/lib/prisma";
 
@@ -20,10 +20,23 @@ const sampleTeams = [
     name: "샘플 기획팀",
     items: [
       {
+        itemType: "both",
         title: "업무보고 수합판 MVP 기획",
         description:
           "◦ PRD와 기술스펙 정리\n◦ 행정망 고정 IP 배포 전제 반영\n\n| 구분 | 완료 | 진행 중 |\n| --- | ---: | ---: |\n| 화면 | 3 | 2 |\n| 보안 | 2 | 1 |",
         nextPlan: "◦ 팀별 작성 화면 개선\n◦ 보고서 표형 미리보기 보완",
+      },
+      {
+        itemType: "previous_only",
+        title: "지난 회차 보고 자료 정리",
+        description: "◦ 팀별 제출 자료 확인\n◦ 누락 항목 보완 요청",
+        nextPlan: "",
+      },
+      {
+        itemType: "current_only",
+        title: "다음 회차 입력 방식 개선",
+        description: "",
+        nextPlan: "◦ 실적만/계획만 선택 기능 적용\n◦ 미리보기 출력 방식 점검",
       },
     ],
   },
@@ -87,36 +100,11 @@ export default async function PreviewPage() {
                   입력된 업무 항목 없음
                 </p>
               ) : (
-                <table className="gov-table w-full border-collapse text-sm leading-6">
-                  <thead>
-                    <tr>
-                      <th className="w-1/2 border px-3 py-2 text-center">
-                        {periodSummary.previous}
-                      </th>
-                      <th className="w-1/2 border px-3 py-2 text-center">
-                        {periodSummary.current}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {team.items.map((item) => (
-                      <tr key={item.title} className="align-top">
-                        <td className="border px-3 py-3">
-                          <p className="font-semibold">■ {item.title}</p>
-                          <div className="mt-2">
-                            <ReportRichText text={item.description} />
-                          </div>
-                        </td>
-                        <td className="border px-3 py-3">
-                          <p className="font-semibold">■ {item.title}</p>
-                          <div className="mt-2">
-                            <ReportRichText text={item.nextPlan} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <ReportTwoColumnTable
+                  items={team.items}
+                  previousLabel={periodSummary.previous}
+                  currentLabel={periodSummary.current}
+                />
               )}
             </section>
           ))}

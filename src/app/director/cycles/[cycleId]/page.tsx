@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, CircleDashed } from "lucide-react";
 import { PrintButton } from "@/components/print-button";
-import { ReportRichText } from "@/components/report-rich-text";
+import { ReportTwoColumnTable } from "@/components/report-two-column-table";
 import { PageShell } from "@/components/page-shell";
 import { BUREAU_NAME, DEPARTMENT_NAMES } from "@/lib/organization";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
@@ -113,30 +113,11 @@ export default async function DirectorReportPage({ params }: DirectorReportPageP
                             입력된 업무 항목이 없습니다.
                           </p>
                         ) : (
-                          <table className="gov-table w-full border-collapse text-sm leading-6">
-                            <thead>
-                              <tr>
-                                <th className="w-1/2 border px-3 py-2 text-center font-semibold">
-                                  {periodSummary.previous}
-                                </th>
-                                <th className="w-1/2 border px-3 py-2 text-center font-semibold">
-                                  {periodSummary.current}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {entry.workItems.map((item) => (
-                                <tr key={item.id} className="align-top">
-                                  <td className="border px-3 py-3">
-                                    <ReportCell title={item.title} body={item.description} note={item.note} />
-                                  </td>
-                                  <td className="border px-3 py-3">
-                                    <ReportCell title={item.title} body={item.nextPlan} />
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <ReportTwoColumnTable
+                            items={entry.workItems}
+                            previousLabel={periodSummary.previous}
+                            currentLabel={periodSummary.current}
+                          />
                         )}
                       </section>
                     ))}
@@ -156,33 +137,6 @@ function SummaryBox({ label, value }: { label: string; value: string }) {
     <div className="gov-kpi border border-[#c8d3df] px-4 py-3">
       <p className="text-sm text-[#667085]">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function ReportCell({
-  title,
-  body,
-  note,
-}: {
-  title: string;
-  body: string;
-  note?: string | null;
-}) {
-  return (
-    <div>
-      <p className="font-semibold">■ {title || "업무명 없음"}</p>
-      {body ? (
-        <div className="mt-2">
-          <ReportRichText text={body} />
-        </div>
-      ) : null}
-      {note ? (
-        <div className="mt-2 text-[#344054]">
-          <p className="font-semibold">※ 비고</p>
-          <ReportRichText text={note} />
-        </div>
-      ) : null}
     </div>
   );
 }

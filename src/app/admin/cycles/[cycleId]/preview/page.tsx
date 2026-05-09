@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PrintButton } from "@/components/print-button";
-import { ReportRichText } from "@/components/report-rich-text";
+import { ReportTwoColumnTable } from "@/components/report-two-column-table";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 
 type PreviewPageProps = {
@@ -68,63 +68,17 @@ export default async function CyclePreviewPage({ params }: PreviewPageProps) {
                   {entry.status === "not_started" ? "작성 전" : "입력된 업무 항목 없음"}
                 </p>
               ) : (
-                <table className="gov-table w-full border-collapse text-sm leading-6">
-                  <thead>
-                    <tr>
-                      <th className="w-1/2 border px-3 py-2 text-center font-semibold">
-                        {periodSummary.previous}
-                      </th>
-                      <th className="w-1/2 border px-3 py-2 text-center font-semibold">
-                        {periodSummary.current}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entry.workItems.map((item) => (
-                      <tr key={item.id} className="align-top">
-                        <td className="border px-3 py-3">
-                          <ReportCell title={item.title} body={item.description} note={item.note} />
-                        </td>
-                        <td className="border px-3 py-3">
-                          <ReportCell title={item.title} body={item.nextPlan} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <ReportTwoColumnTable
+                  items={entry.workItems}
+                  previousLabel={periodSummary.previous}
+                  currentLabel={periodSummary.current}
+                />
               )}
             </section>
           ))}
         </div>
       </article>
     </main>
-  );
-}
-
-function ReportCell({
-  title,
-  body,
-  note,
-}: {
-  title: string;
-  body: string;
-  note?: string | null;
-}) {
-  return (
-    <div>
-      <p className="font-semibold">■ {title || "업무명 없음"}</p>
-      {body ? (
-        <div className="mt-2">
-          <ReportRichText text={body} />
-        </div>
-      ) : null}
-      {note ? (
-        <div className="mt-2 text-[#344054]">
-          <p className="font-semibold">※ 비고</p>
-          <ReportRichText text={note} />
-        </div>
-      ) : null}
-    </div>
   );
 }
 
