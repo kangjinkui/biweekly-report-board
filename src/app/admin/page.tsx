@@ -3,13 +3,19 @@ import {
   CalendarDays,
   FileText,
   LockKeyhole,
+  LogOut,
   Network,
   Printer,
   ShieldCheck,
+  UserCog,
   Users,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PageShell } from "@/components/page-shell";
+import { requireAdminUser } from "@/lib/auth";
+import type { CurrentUser } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 const setupItems = [
   {
@@ -33,14 +39,23 @@ const securityItems = [
   "PostgreSQL은 Docker 내부 네트워크에서만 접근",
 ];
 
-async function getDashboardData() {
+async function getDashboardData(user: CurrentUser) {
+  const teamWhere =
+    user.role === "super_admin"
+      ? { isActive: true }
+      : { isActive: true, departmentName: user.managedDepartmentName ?? "" };
+
   try {
     const [activeTeams, latestCycle] = await Promise.all([
-      prisma.team.count({ where: { isActive: true } }),
+      prisma.team.count({ where: teamWhere }),
       prisma.reportCycle.findFirst({
         orderBy: [{ status: "asc" }, { startDate: "desc" }],
         include: {
           entries: {
+            where:
+              user.role === "super_admin"
+                ? undefined
+                : { team: { departmentName: user.managedDepartmentName ?? "" } },
             select: { status: true },
           },
         },
@@ -62,7 +77,8 @@ async function getDashboardData() {
 }
 
 export default async function AdminPage() {
-  const dashboard = await getDashboardData();
+  const user = await requireAdminUser();
+  const dashboard = await getDashboardData(user);
   const submittedCount =
     dashboard.latestCycle?.entries.filter((entry) =>
       ["submitted", "completed"].includes(entry.status),
@@ -70,6 +86,12 @@ export default async function AdminPage() {
   const totalEntries = dashboard.latestCycle?.entries.length ?? 0;
   const menuItems = [
     ...setupItems,
+    {
+      label: "사용자 관리",
+      description: "가입 대기 승인과 사용자 역할을 관리합니다.",
+      href: "/admin/users",
+      icon: UserCog,
+    },
     {
       label: "보고서 미리보기",
       description: dashboard.latestCycle
@@ -87,10 +109,18 @@ export default async function AdminPage() {
       title="격주 업무보고 수합판"
       description="팀별 보고 입력, 과별 수합, 국장 보고 화면을 한곳에서 관리합니다."
       actions={
-        <div className="flex items-center gap-2 border border-[#7db5e5] bg-white/10 px-3 py-2 text-sm font-semibold">
-          <ShieldCheck className="h-4 w-4" aria-hidden />
-          행정망 접근 전제
-        </div>
+        <>
+          <div className="flex items-center gap-2 border border-[#7db5e5] bg-white/10 px-3 py-2 text-sm font-semibold">
+            <ShieldCheck className="h-4 w-4" aria-hidden />
+            행정망 접근 전제
+          </div>
+          <form action="/logout" method="post">
+            <button className="inline-flex items-center gap-2 border border-white/30 px-3 py-2 text-sm font-semibold">
+              <LogOut className="h-4 w-4" aria-hidden />
+              로그아웃
+            </button>
+          </form>
+        </>
       }
     >
       <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">

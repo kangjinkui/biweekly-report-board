@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { canManageDepartment, requireAdminUser } from "@/lib/auth";
 
 const statusSchema = z.object({
   cycleId: z.string().uuid(),
@@ -17,6 +18,7 @@ const statusSchema = z.object({
 });
 
 export async function updateEntryStatus(formData: FormData) {
+  const user = await requireAdminUser();
   const parsed = statusSchema.safeParse({
     cycleId: formData.get("cycleId"),
     entryId: formData.get("entryId"),
@@ -24,6 +26,11 @@ export async function updateEntryStatus(formData: FormData) {
   });
 
   if (!parsed.success) return;
+  const entry = await prisma.reportEntry.findUnique({
+    where: { id: parsed.data.entryId },
+    include: { team: true },
+  });
+  if (!entry || !canManageDepartment(user, entry.team.departmentName)) return;
 
   await prisma.reportEntry.update({
     where: { id: parsed.data.entryId },

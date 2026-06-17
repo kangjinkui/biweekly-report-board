@@ -1,22 +1,42 @@
 import Link from "next/link";
-import { ArrowDown, ArrowLeft, ArrowUp, KeyRound, Plus, Power, Save, Users } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  KeyRound,
+  Plus,
+  Power,
+  Save,
+  Users,
+} from "lucide-react";
 import {
   createTeam,
+  deleteTeam,
   moveTeam,
   rotateTeamWriteToken,
   toggleTeamActive,
   updateTeamName,
 } from "./actions";
 import { prisma } from "@/lib/prisma";
-import { DEPARTMENT_NAMES } from "@/lib/organization";
+import { compareTeamsByDepartmentOrder, DEPARTMENT_NAMES } from "@/lib/organization";
 import { PageShell } from "@/components/page-shell";
+import { requireAdminUser, type CurrentUser } from "@/lib/auth";
+import { DeleteTeamButton } from "./delete-team-button";
 
-async function getTeams() {
+export const dynamic = "force-dynamic";
+
+async function getTeams(user: CurrentUser) {
   try {
-    return {
-      teams: await prisma.team.findMany({
+    const teams = await prisma.team.findMany({
+        where:
+          user.role === "super_admin"
+            ? undefined
+            : { departmentName: user.managedDepartmentName ?? "" },
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-      }),
+      });
+
+    return {
+      teams: teams.sort(compareTeamsByDepartmentOrder),
       error: null,
     };
   } catch {
@@ -28,7 +48,12 @@ async function getTeams() {
 }
 
 export default async function TeamsPage() {
-  const { teams, error } = await getTeams();
+  const user = await requireAdminUser();
+  const { teams, error } = await getTeams(user);
+  const defaultDepartmentName =
+    user.role === "super_admin"
+      ? "도시계획과"
+      : user.managedDepartmentName ?? "도시계획과";
 
   return (
     <PageShell
@@ -78,7 +103,10 @@ export default async function TeamsPage() {
             required
           />
         </label>
-        <DepartmentSelect defaultValue="도시계획과" />
+        <DepartmentSelect
+          defaultValue={defaultDepartmentName}
+          lockedDepartmentName={user.role === "super_admin" ? undefined : defaultDepartmentName}
+        />
       </form>
 
       {error ? (
@@ -97,17 +125,27 @@ export default async function TeamsPage() {
         </div>
       ) : (
         <div className="gov-panel mt-6 overflow-hidden">
-          <div className="grid grid-cols-[70px_1fr_110px_250px] border-b border-[#8fa9c1] bg-[#e8f1fa] px-4 py-3 text-sm font-semibold text-[#102a43]">
+          <div className="grid grid-cols-[70px_1fr_110px_300px] border-b border-[#8fa9c1] bg-[#e8f1fa] px-4 py-3 text-sm font-semibold text-[#102a43]">
             <span>순서</span>
             <span>소속 과 / 팀명</span>
             <span>상태</span>
             <span>작업</span>
           </div>
           <div className="divide-y divide-[#c8d3df]">
-            {teams.map((team, index) => (
+            {teams.map((team, index) => {
+              const departmentTeams = teams.filter(
+                (departmentTeam) => departmentTeam.departmentName === team.departmentName,
+              );
+              const departmentIndex = departmentTeams.findIndex(
+                (departmentTeam) => departmentTeam.id === team.id,
+              );
+              const isFirstInDepartment = departmentIndex === 0;
+              const isLastInDepartment = departmentIndex === departmentTeams.length - 1;
+
+              return (
               <div
                 key={team.id}
-                className="grid grid-cols-[70px_1fr_110px_250px] items-center gap-3 px-4 py-3"
+                className="grid grid-cols-[70px_1fr_110px_300px] items-center gap-3 px-4 py-3"
               >
                 <span className="text-sm text-[#667085]">{index + 1}</span>
                 <form
@@ -115,7 +153,11 @@ export default async function TeamsPage() {
                   className="grid grid-cols-[180px_1fr_auto] gap-2"
                 >
                   <input type="hidden" name="id" value={team.id} />
-                  <DepartmentSelect defaultValue={team.departmentName} hideLabel />
+                  <DepartmentSelect
+                    defaultValue={team.departmentName}
+                    hideLabel
+                    lockedDepartmentName={user.role === "super_admin" ? undefined : team.departmentName}
+                  />
                   <input
                     name="name"
                     defaultValue={team.name}
@@ -143,8 +185,9 @@ export default async function TeamsPage() {
                     <input type="hidden" name="id" value={team.id} />
                     <input type="hidden" name="direction" value="up" />
                     <button
-                      className="inline-flex h-9 w-9 items-center justify-center border border-[#c8d3df]"
+                      className="inline-flex h-9 w-9 items-center justify-center border border-[#c8d3df] disabled:cursor-not-allowed disabled:opacity-35"
                       title="위로 이동"
+                      disabled={isFirstInDepartment}
                     >
                       <ArrowUp className="h-4 w-4" aria-hidden />
                     </button>
@@ -153,8 +196,9 @@ export default async function TeamsPage() {
                     <input type="hidden" name="id" value={team.id} />
                     <input type="hidden" name="direction" value="down" />
                     <button
-                      className="inline-flex h-9 w-9 items-center justify-center border border-[#c8d3df]"
+                      className="inline-flex h-9 w-9 items-center justify-center border border-[#c8d3df] disabled:cursor-not-allowed disabled:opacity-35"
                       title="아래로 이동"
+                      disabled={isLastInDepartment}
                     >
                       <ArrowDown className="h-4 w-4" aria-hidden />
                     </button>
@@ -178,9 +222,14 @@ export default async function TeamsPage() {
                       <KeyRound className="h-4 w-4" aria-hidden />
                     </button>
                   </form>
+                  <form action={deleteTeam}>
+                    <input type="hidden" name="id" value={team.id} />
+                    <DeleteTeamButton teamName={team.name} />
+                  </form>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -191,10 +240,26 @@ export default async function TeamsPage() {
 function DepartmentSelect({
   defaultValue,
   hideLabel = false,
+  lockedDepartmentName,
 }: {
   defaultValue: string;
   hideLabel?: boolean;
+  lockedDepartmentName?: string;
 }) {
+  if (lockedDepartmentName) {
+    return (
+      <label>
+        {hideLabel ? null : (
+          <span className="mb-2 block text-sm font-semibold">소속 과</span>
+        )}
+        <input type="hidden" name="departmentName" value={lockedDepartmentName} />
+        <div className="w-full border border-[#c8d3df] bg-[#f6f9fc] px-3 py-2 text-sm">
+          {lockedDepartmentName}
+        </div>
+      </label>
+    );
+  }
+
   return (
     <label>
       {hideLabel ? null : (

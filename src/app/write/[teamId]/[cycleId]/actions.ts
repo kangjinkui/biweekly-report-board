@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { normalizeWorkItemType, WORK_ITEM_TYPES } from "@/lib/work-items";
+import { canWriteTeam, requireApprovedUser } from "@/lib/auth";
 
 const workItemSchema = z.object({
   itemType: z.enum(WORK_ITEM_TYPES).default("both"),
@@ -20,6 +21,7 @@ export async function addWorkItem(formData: FormData) {
   const itemType = normalizeWorkItemType(formData.get("itemType"));
 
   if (!entryId || !teamId || !cycleId) return;
+  if (!(await canWriteEntry(entryId, teamId, cycleId))) return;
 
   const lastItem = await prisma.workItem.findFirst({
     where: { reportEntryId: entryId },
@@ -67,6 +69,7 @@ export async function updateWorkItem(formData: FormData) {
   });
 
   if (!itemId || !entryId || !teamId || !cycleId || !parsed.success) return;
+  if (!(await canWriteEntry(entryId, teamId, cycleId))) return;
 
   await prisma.$transaction([
     prisma.workItem.update({
@@ -93,6 +96,7 @@ export async function deleteWorkItem(formData: FormData) {
   const cycleId = String(formData.get("cycleId") ?? "");
 
   if (!itemId || !entryId || !teamId || !cycleId) return;
+  if (!(await canWriteEntry(entryId, teamId, cycleId))) return;
 
   await prisma.$transaction([
     prisma.workItem.delete({
@@ -122,6 +126,7 @@ export async function moveWorkItem(formData: FormData) {
   if (!itemId || !entryId || !teamId || !cycleId || !["up", "down"].includes(direction)) {
     return;
   }
+  if (!(await canWriteEntry(entryId, teamId, cycleId))) return;
 
   const current = await prisma.workItem.findUnique({ where: { id: itemId } });
   if (!current) return;
@@ -166,6 +171,7 @@ export async function submitEntry(formData: FormData) {
   const cycleId = String(formData.get("cycleId") ?? "");
 
   if (!entryId || !teamId || !cycleId) return;
+  if (!(await canWriteEntry(entryId, teamId, cycleId))) return;
 
   const validItems = await prisma.workItem.count({
     where: {
@@ -213,6 +219,7 @@ export async function copyPreviousEntry(formData: FormData) {
   const cycleId = String(formData.get("cycleId") ?? "");
 
   if (!entryId || !teamId || !cycleId) return;
+  if (!(await canWriteEntry(entryId, teamId, cycleId))) return;
 
   const currentCycle = await prisma.reportCycle.findUnique({
     where: { id: cycleId },
@@ -293,4 +300,16 @@ function revalidateAdminPaths(cycleId: string) {
   revalidatePath(`/admin/cycles/${cycleId}/status`);
   revalidatePath(`/admin/cycles/${cycleId}/preview`);
   revalidatePath(`/director/cycles/${cycleId}`);
+}
+
+async function canWriteEntry(entryId: string, teamId: string, cycleId: string) {
+  const user = await requireApprovedUser();
+  if (!canWriteTeam(user, teamId)) return false;
+
+  const entry = await prisma.reportEntry.findUnique({
+    where: { id: entryId },
+    select: { teamId: true, reportCycleId: true },
+  });
+
+  return entry?.teamId === teamId && entry.reportCycleId === cycleId;
 }

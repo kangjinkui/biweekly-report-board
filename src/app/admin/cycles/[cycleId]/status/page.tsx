@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { updateEntryStatus } from "./actions";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 import { PageShell } from "@/components/page-shell";
+import { requireAdminUser } from "@/lib/auth";
+import { compareReportEntriesByDepartmentOrder } from "@/lib/organization";
 
 type StatusPageProps = {
   params: Promise<{
@@ -21,11 +23,17 @@ const statuses = [
 ] as const;
 
 export default async function StatusPage({ params }: StatusPageProps) {
+  const user = await requireAdminUser();
   const { cycleId } = await params;
+  const entryWhere =
+    user.role === "super_admin"
+      ? undefined
+      : { team: { departmentName: user.managedDepartmentName ?? "" } };
   const cycle = await prisma.reportCycle.findUnique({
     where: { id: cycleId },
     include: {
       entries: {
+        where: entryWhere,
         orderBy: {
           team: { displayOrder: "asc" },
         },
@@ -40,8 +48,9 @@ export default async function StatusPage({ params }: StatusPageProps) {
   });
 
   if (!cycle) notFound();
+  const entries = [...cycle.entries].sort(compareReportEntriesByDepartmentOrder);
 
-  const submittedCount = cycle.entries.filter((entry) =>
+  const submittedCount = entries.filter((entry) =>
     ["submitted", "completed"].includes(entry.status),
   ).length;
   const periodSummary = formatCyclePeriodSummary(cycle);
@@ -60,7 +69,7 @@ export default async function StatusPage({ params }: StatusPageProps) {
             회차 관리
           </Link>
           <div className="border border-[#7db5e5] bg-white/10 px-4 py-3 text-sm font-semibold">
-          제출 {submittedCount}/{cycle.entries.length}
+          제출 {submittedCount}/{entries.length}
           </div>
         </>
       }
@@ -78,7 +87,7 @@ export default async function StatusPage({ params }: StatusPageProps) {
           <span>작업</span>
         </div>
         <div className="divide-y divide-[#c8d3df]">
-          {cycle.entries.map((entry) => (
+          {entries.map((entry) => (
             <div
               key={entry.id}
               className="grid grid-cols-[1fr_120px_110px_170px_270px] items-center gap-3 px-4 py-3 text-sm"

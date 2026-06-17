@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, CircleDashed } from "lucide-react";
+import { CheckCircle2, CircleDashed } from "lucide-react";
 import { PrintButton } from "@/components/print-button";
 import { ReportTwoColumnTable } from "@/components/report-two-column-table";
 import { PageShell } from "@/components/page-shell";
@@ -9,28 +8,25 @@ import {
   compareReportEntriesByDepartmentOrder,
   DEPARTMENT_NAMES,
 } from "@/lib/organization";
-import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 import { prisma } from "@/lib/prisma";
-import { requireAdminUser } from "@/lib/auth";
+import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 
-type DirectorReportPageProps = {
+export const dynamic = "force-dynamic";
+
+type SharedDirectorReportPageProps = {
   params: Promise<{
-    cycleId: string;
+    token: string;
   }>;
 };
 
-export default async function DirectorReportPage({ params }: DirectorReportPageProps) {
-  const user = await requireAdminUser();
-  const { cycleId } = await params;
-  const entryWhere =
-    user.role === "super_admin"
-      ? undefined
-      : { team: { departmentName: user.managedDepartmentName ?? "" } };
+export default async function SharedDirectorReportPage({
+  params,
+}: SharedDirectorReportPageProps) {
+  const { token } = await params;
   const cycle = await prisma.reportCycle.findUnique({
-    where: { id: cycleId },
+    where: { shareToken: token },
     include: {
       entries: {
-        where: entryWhere,
         orderBy: [
           { team: { departmentName: "asc" } },
           { team: { displayOrder: "asc" } },
@@ -52,26 +48,15 @@ export default async function DirectorReportPage({ params }: DirectorReportPageP
   const submittedEntries = entries.filter((entry) =>
     ["submitted", "completed"].includes(entry.status),
   );
-  const visibleDepartmentNames =
-    user.role === "super_admin"
-      ? DEPARTMENT_NAMES
-      : DEPARTMENT_NAMES.filter((departmentName) => departmentName === user.managedDepartmentName);
 
   return (
     <PageShell
-      eyebrow={`${BUREAU_NAME}장 보고`}
+      eyebrow={`${BUREAU_NAME} 국장 보고`}
       title={cycle.title}
       description={`${periodSummary.project} / ${periodSummary.previous} / ${periodSummary.current}`}
       maxWidth="max-w-6xl"
       actions={
         <div className="no-print flex flex-wrap items-center gap-2">
-          <Link
-            href="/admin/cycles"
-            className="inline-flex items-center gap-2 border border-white/30 px-3 py-2 text-sm font-semibold"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            회차 관리
-          </Link>
           <span className="border border-[#7db5e5] bg-white/10 px-3 py-2 text-sm font-semibold">
             제출 {submittedEntries.length}/{entries.length}
           </span>
@@ -81,13 +66,13 @@ export default async function DirectorReportPage({ params }: DirectorReportPageP
     >
       <article className="gov-panel p-5 print:border-0 print:p-0 print:shadow-none">
         <section className="mt-6 grid gap-3 md:grid-cols-3">
-          <SummaryBox label="대상 과" value={`${visibleDepartmentNames.length}개`} />
+          <SummaryBox label="대상 과" value={`${DEPARTMENT_NAMES.length}개`} />
           <SummaryBox label="수합 팀" value={`${entries.length}개`} />
           <SummaryBox label="제출 완료" value={`${submittedEntries.length}개`} />
         </section>
 
         <div className="mt-8 space-y-8">
-          {visibleDepartmentNames.map((departmentName) => {
+          {DEPARTMENT_NAMES.map((departmentName) => {
             const departmentEntries = entries.filter(
               (entry) => entry.team.departmentName === departmentName,
             );
@@ -106,15 +91,12 @@ export default async function DirectorReportPage({ params }: DirectorReportPageP
 
                 {departmentEntries.length === 0 ? (
                   <p className="border border-t-0 border-[#c8d3df] bg-white px-4 py-4 text-sm text-[#667085]">
-                    이 회차에 연결된 팀 보고가 없습니다.
+                    이 회차에 연결된 보고가 없습니다.
                   </p>
                 ) : (
                   <div className="space-y-4 border border-t-0 border-[#c8d3df] bg-white p-4">
                     {departmentEntries.map((entry) => (
-                      <section
-                        key={entry.id}
-                        className="border border-[#aebfd0] bg-white"
-                      >
+                      <section key={entry.id} className="border border-[#aebfd0] bg-white">
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#c8d3df] bg-[#eef5fb] px-4 py-3">
                           <div>
                             <h3 className="font-semibold">{entry.team.name}</h3>
@@ -126,7 +108,9 @@ export default async function DirectorReportPage({ params }: DirectorReportPageP
                         </div>
                         {entry.workItems.length === 0 ? (
                           <p className="px-4 py-4 text-sm text-[#667085]">
-                            입력된 업무 항목이 없습니다.
+                            {entry.status === "not_started"
+                              ? "아직 작성 전입니다."
+                              : "입력된 업무 항목이 없습니다."}
                           </p>
                         ) : (
                           <ReportTwoColumnTable

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { WORK_ITEM_TYPES } from "@/lib/work-items";
+import { canWriteTeam, getCurrentUser } from "@/lib/auth";
 
 const updateWorkItemSchema = z.object({
   entryId: z.string().uuid(),
@@ -32,13 +33,22 @@ export async function PATCH(request: NextRequest, context: WorkItemRouteContext)
       { status: 400 },
     );
   }
+  const user = await getCurrentUser();
+  if (!user || !canWriteTeam(user, parsed.data.teamId)) {
+    return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+  }
 
   const item = await prisma.workItem.findUnique({
     where: { id: itemId },
-    select: { reportEntryId: true },
+    select: { reportEntryId: true, entry: { select: { teamId: true, reportCycleId: true } } },
   });
 
-  if (!item || item.reportEntryId !== parsed.data.entryId) {
+  if (
+    !item ||
+    item.reportEntryId !== parsed.data.entryId ||
+    item.entry.teamId !== parsed.data.teamId ||
+    item.entry.reportCycleId !== parsed.data.cycleId
+  ) {
     return NextResponse.json(
       { ok: false, message: "업무 항목을 찾을 수 없습니다." },
       { status: 404 },

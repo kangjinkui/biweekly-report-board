@@ -20,7 +20,11 @@ import {
 import { WorkItemEditor } from "./work-item-editor";
 import { formatCyclePeriodSummary, formatKoreanDate } from "@/lib/report-cycle";
 import { PageShell } from "@/components/page-shell";
+import { ReportTwoColumnTable } from "@/components/report-two-column-table";
 import { WORK_ITEM_TYPE_LABELS, WORK_ITEM_TYPES } from "@/lib/work-items";
+import { canWriteTeam, requireApprovedUser, type CurrentUser } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 type WritePageProps = {
   params: Promise<{
@@ -30,14 +34,16 @@ type WritePageProps = {
 };
 
 export default async function WritePage({ params }: WritePageProps) {
+  const user = await requireApprovedUser();
   const { teamId, cycleId } = await params;
-  const data = await getWriteData(teamId, cycleId);
+  const data = await getWriteData(teamId, cycleId, user);
 
   if (!data) {
     notFound();
   }
 
-  const { team, cycle, entry } = data;
+  const { team, cycle, entry, departmentEntries } = data;
+  const canEdit = canWriteTeam(user, teamId);
   const isSubmitted = entry.status === "submitted";
   const periodSummary = formatCyclePeriodSummary(cycle);
 
@@ -57,50 +63,52 @@ export default async function WritePage({ params }: WritePageProps) {
       }
     >
       <Link
-        href="/admin"
+        href={canEdit ? "/my" : "/admin"}
         className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#005bac]"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
-        관리자 화면
+        {canEdit ? "내 업무보고" : "관리자 화면"}
       </Link>
 
-      <section className="mt-6 flex flex-wrap gap-3">
-        <form action={addWorkItem}>
-          <HiddenContext entryId={entry.id} teamId={team.id} cycleId={cycle.id} />
-          <div className="inline-flex flex-wrap gap-2">
-            {WORK_ITEM_TYPES.map((itemType) => (
-              <button
-                key={itemType}
-                name="itemType"
-                value={itemType}
-                className="gov-action inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
-              >
-                <Plus className="h-4 w-4" aria-hidden />
-                {WORK_ITEM_TYPE_LABELS[itemType]} 추가
-              </button>
-            ))}
-          </div>
-        </form>
+      {canEdit ? (
+        <section className="mt-6 flex flex-wrap gap-3">
+          <form action={addWorkItem}>
+            <HiddenContext entryId={entry.id} teamId={team.id} cycleId={cycle.id} />
+            <div className="inline-flex flex-wrap gap-2">
+              {WORK_ITEM_TYPES.map((itemType) => (
+                <button
+                  key={itemType}
+                  name="itemType"
+                  value={itemType}
+                  className="gov-action inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
+                >
+                  <Plus className="h-4 w-4" aria-hidden />
+                  {WORK_ITEM_TYPE_LABELS[itemType]} 추가
+                </button>
+              ))}
+            </div>
+          </form>
 
-        <form action={copyPreviousEntry}>
-          <HiddenContext entryId={entry.id} teamId={team.id} cycleId={cycle.id} />
-          <button className="gov-subtle-action inline-flex items-center gap-2 border px-4 py-2 text-sm font-semibold">
-            <ClipboardCopy className="h-4 w-4" aria-hidden />
-            지난 회차 복사
-          </button>
-        </form>
+          <form action={copyPreviousEntry}>
+            <HiddenContext entryId={entry.id} teamId={team.id} cycleId={cycle.id} />
+            <button className="gov-subtle-action inline-flex items-center gap-2 border px-4 py-2 text-sm font-semibold">
+              <ClipboardCopy className="h-4 w-4" aria-hidden />
+              지난 회차 복사
+            </button>
+          </form>
 
-        <form action={submitEntry}>
-          <HiddenContext entryId={entry.id} teamId={team.id} cycleId={cycle.id} />
-          <button
-            className="inline-flex items-center gap-2 border border-[#005bac] bg-white px-4 py-2 text-sm font-semibold text-[#005bac] disabled:cursor-not-allowed disabled:border-[#c8d3df] disabled:text-[#667085]"
-            disabled={entry.workItems.length === 0}
-          >
-            <Send className="h-4 w-4" aria-hidden />
-            제출
-          </button>
-        </form>
-      </section>
+          <form action={submitEntry}>
+            <HiddenContext entryId={entry.id} teamId={team.id} cycleId={cycle.id} />
+            <button
+              className="inline-flex items-center gap-2 border border-[#005bac] bg-white px-4 py-2 text-sm font-semibold text-[#005bac] disabled:cursor-not-allowed disabled:border-[#c8d3df] disabled:text-[#667085]"
+              disabled={entry.workItems.length === 0}
+            >
+              <Send className="h-4 w-4" aria-hidden />
+              제출
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       {isSubmitted ? (
         <div className="gov-panel mt-4 p-4 text-sm text-[#344054]">
@@ -110,10 +118,22 @@ export default async function WritePage({ params }: WritePageProps) {
 
       {entry.workItems.length === 0 ? (
         <div className="gov-panel mt-6 p-8 text-center">
-          <h2 className="font-semibold">입력된 업무 항목이 없습니다</h2>
+          <h2 className="font-semibold">
+            {canEdit ? "입력된 업무 항목이 없습니다" : "아직 작성 전입니다"}
+          </h2>
           <p className="mt-2 text-sm text-[#667085]">
-            보고 항목 추가를 눌러 지난 업무 실적과 다음 주 계획을 작성하세요.
+            {canEdit
+              ? "보고 항목 추가를 눌러 지난 업무 실적과 다음 주 계획을 작성하세요."
+              : "이 팀은 이번 회차 보고서를 아직 작성하지 않았습니다."}
           </p>
+        </div>
+      ) : !canEdit ? (
+        <div className="gov-panel mt-6 p-4">
+          <ReportTwoColumnTable
+            items={entry.workItems}
+            previousLabel={periodSummary.previous}
+            currentLabel={periodSummary.current}
+          />
         </div>
       ) : (
         <div className="mt-6 grid gap-4">
@@ -158,11 +178,70 @@ export default async function WritePage({ params }: WritePageProps) {
           ))}
         </div>
       )}
+
+      <section className="gov-panel mt-8 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#c8d3df] pb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[#003f7d]">
+              {team.departmentName} 주간업무보고
+            </h2>
+            <p className="mt-1 text-sm text-[#667085]">
+              {canEdit
+                ? "같은 부서에서 이번 회차에 작성 중인 보고만 표시합니다."
+                : "담당 과 전체 팀의 이번 회차 보고를 작성 전까지 표시합니다."}
+            </p>
+          </div>
+          <span className="border border-[#c8d3df] bg-white px-3 py-1 text-sm text-[#344054]">
+            {departmentEntries.length}개 팀
+          </span>
+        </div>
+
+        {departmentEntries.length === 0 ? (
+          <p className="mt-5 border border-[#c8d3df] bg-white px-4 py-4 text-sm text-[#667085]">
+            아직 같은 부서에서 작성 중인 보고가 없습니다.
+          </p>
+        ) : (
+          <div className="mt-5 space-y-5">
+            {departmentEntries.map((departmentEntry) => (
+              <section key={departmentEntry.id} className="border border-[#c8d3df] bg-white">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#c8d3df] bg-[#f6f9fc] px-4 py-3">
+                  <div>
+                    <h3 className="font-semibold">{departmentEntry.team.name}</h3>
+                    <p className="mt-1 text-sm text-[#667085]">
+                      보고 항목 {departmentEntry.workItems.length}개
+                    </p>
+                  </div>
+                  <span className="border border-[#c8d3df] bg-white px-3 py-1 text-sm text-[#344054]">
+                    {entryStatusLabel(departmentEntry.status)}
+                  </span>
+                </div>
+                {departmentEntry.workItems.length === 0 ? (
+                  <p className="px-4 py-4 text-sm text-[#667085]">
+                    {departmentEntry.status === "not_started"
+                      ? "아직 작성 전입니다."
+                      : "입력된 업무 항목이 없습니다."}
+                  </p>
+                ) : (
+                  <ReportTwoColumnTable
+                    items={departmentEntry.workItems}
+                    previousLabel={periodSummary.previous}
+                    currentLabel={periodSummary.current}
+                  />
+                )}
+              </section>
+            ))}
+          </div>
+        )}
+      </section>
     </PageShell>
   );
 }
 
-async function getWriteData(teamId: string, cycleId: string) {
+async function getWriteData(
+  teamId: string,
+  cycleId: string,
+  user: CurrentUser,
+) {
   const [team, cycle] = await Promise.all([
     prisma.team.findUnique({ where: { id: teamId } }),
     prisma.reportCycle.findUnique({ where: { id: cycleId } }),
@@ -170,6 +249,43 @@ async function getWriteData(teamId: string, cycleId: string) {
 
   if (!team || !cycle || !team.isActive) {
     return null;
+  }
+
+  const canEdit = canWriteTeam(user, teamId);
+  const canViewDepartment =
+    user.role === "super_admin" ||
+    (user.role === "department_manager" &&
+      user.managedDepartmentName === team.departmentName);
+  const departmentName = canViewDepartment
+    ? team.departmentName
+    : user.team?.departmentName;
+
+  if (!canEdit && !canViewDepartment) {
+    return null;
+  }
+
+  if (!departmentName || team.departmentName !== departmentName) {
+    return null;
+  }
+
+  const departmentTeams = await prisma.team.findMany({
+    where: {
+      departmentName,
+      isActive: true,
+    },
+    orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+    select: { id: true },
+  });
+  const departmentTeamIds = departmentTeams.map((departmentTeam) => departmentTeam.id);
+
+  if (canViewDepartment) {
+    await prisma.reportEntry.createMany({
+      data: departmentTeamIds.map((departmentTeamId) => ({
+        reportCycleId: cycleId,
+        teamId: departmentTeamId,
+      })),
+      skipDuplicates: true,
+    });
   }
 
   const entry = await prisma.reportEntry.upsert({
@@ -191,7 +307,27 @@ async function getWriteData(teamId: string, cycleId: string) {
     },
   });
 
-  return { team, cycle, entry };
+  const departmentEntries = await prisma.reportEntry.findMany({
+    where: {
+      reportCycleId: cycleId,
+      teamId: { in: departmentTeamIds },
+      ...(canViewDepartment
+        ? {}
+        : {
+            status: { not: "not_started" as const },
+            workItems: { some: {} },
+          }),
+    },
+    orderBy: [{ team: { displayOrder: "asc" } }, { createdAt: "asc" }],
+    include: {
+      team: true,
+      workItems: {
+        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
+  });
+
+  return { team, cycle, entry, departmentEntries };
 }
 
 function HiddenContext({

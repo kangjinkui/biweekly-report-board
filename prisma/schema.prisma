@@ -26,6 +26,18 @@ enum WorkItemType {
   both
 }
 
+enum AdminRole {
+  super_admin
+  department_manager
+  team_user
+}
+
+enum UserStatus {
+  pending
+  approved
+  rejected
+}
+
 model Team {
   id             String        @id @default(uuid()) @db.Uuid
   name           String
@@ -34,6 +46,7 @@ model Team {
   isActive       Boolean       @default(true)
   writeTokenHash String        @unique
   entries        ReportEntry[]
+  users          AdminUser[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -52,6 +65,7 @@ model ReportCycle {
   currentEndDate    DateTime          @db.Date
   dueDate           DateTime          @db.Date
   status            ReportCycleStatus @default(draft)
+  shareToken        String?           @unique
   shareTokenHash    String            @unique
   entries           ReportEntry[]
   createdAt         DateTime          @default(now())
@@ -98,12 +112,26 @@ model WorkItem {
 }
 
 model AdminUser {
-  id           String    @id @default(uuid()) @db.Uuid
-  email        String    @unique
-  passwordHash String
-  sessions     Session[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                    String      @id @default(uuid()) @db.Uuid
+  email                 String      @unique
+  passwordHash          String
+  name                  String      @default("")
+  role                  AdminRole   @default(team_user)
+  status                UserStatus  @default(pending)
+  teamId                String?     @db.Uuid
+  managedDepartmentName String?
+  approvedAt            DateTime?
+  approvedById          String?     @db.Uuid
+  team                  Team?       @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  approvedBy            AdminUser?  @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers         AdminUser[] @relation("UserApprovals")
+  sessions              Session[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([role, status])
+  @@index([teamId])
+  @@index([managedDepartmentName])
 }
 
 model Session {

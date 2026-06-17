@@ -5,6 +5,9 @@ import { PrintButton } from "@/components/print-button";
 import { ReportTwoColumnTable } from "@/components/report-two-column-table";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 import { prisma } from "@/lib/prisma";
+import { requireAdminUser } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 const sampleCycle = {
   startDate: new Date("2025-05-22T00:00:00.000Z"),
@@ -60,6 +63,7 @@ async function getLatestCycleId() {
 }
 
 export default async function PreviewPage() {
+  await requireAdminUser();
   const latestCycleId = await getLatestCycleId();
 
   if (latestCycleId) {

@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { PrintButton } from "@/components/print-button";
 import { ReportTwoColumnTable } from "@/components/report-two-column-table";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
+import { requireAdminUser } from "@/lib/auth";
+import { compareReportEntriesByDepartmentOrder } from "@/lib/organization";
 
 type PreviewPageProps = {
   params: Promise<{
@@ -13,11 +15,17 @@ type PreviewPageProps = {
 };
 
 export default async function CyclePreviewPage({ params }: PreviewPageProps) {
+  const user = await requireAdminUser();
   const { cycleId } = await params;
+  const entryWhere =
+    user.role === "super_admin"
+      ? undefined
+      : { team: { departmentName: user.managedDepartmentName ?? "" } };
   const cycle = await prisma.reportCycle.findUnique({
     where: { id: cycleId },
     include: {
       entries: {
+        where: entryWhere,
         orderBy: {
           team: { displayOrder: "asc" },
         },
@@ -32,6 +40,7 @@ export default async function CyclePreviewPage({ params }: PreviewPageProps) {
   });
 
   if (!cycle) notFound();
+  const entries = [...cycle.entries].sort(compareReportEntriesByDepartmentOrder);
 
   const periodSummary = formatCyclePeriodSummary(cycle);
 
@@ -57,7 +66,7 @@ export default async function CyclePreviewPage({ params }: PreviewPageProps) {
         </header>
 
         <div className="mt-8 space-y-8">
-          {cycle.entries.map((entry) => (
+          {entries.map((entry) => (
             <section key={entry.id}>
               <div className="flex items-center justify-between border-b-2 border-[#005bac] bg-[#f6f9fc] px-4 py-3">
                 <h2 className="text-xl font-semibold text-[#003f7d]">{entry.team.name}</h2>

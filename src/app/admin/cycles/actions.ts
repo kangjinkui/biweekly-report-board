@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createTokenPair } from "@/lib/tokens";
+import { requireAdminUser } from "@/lib/auth";
 
 const cycleSchema = z
   .object({
@@ -45,6 +46,7 @@ const cycleSchema = z
   });
 
 export async function createCycle(formData: FormData) {
+  await requireAdminUser();
   const parsed = cycleSchema.safeParse({
     title: formData.get("title"),
     startDate: formData.get("startDate"),
@@ -76,6 +78,7 @@ export async function createCycle(formData: FormData) {
       currentStartDate: toDate(parsed.data.currentStartDate),
       currentEndDate: toDate(parsed.data.currentEndDate),
       dueDate: toDate(parsed.data.dueDate),
+      shareToken: shareToken.token,
       shareTokenHash: shareToken.tokenHash,
       entries: {
         create: activeTeams.map((team) => ({
@@ -90,6 +93,7 @@ export async function createCycle(formData: FormData) {
 }
 
 export async function updateCycle(formData: FormData) {
+  await requireAdminUser();
   const id = String(formData.get("id") ?? "");
   const parsed = cycleSchema.safeParse({
     title: formData.get("title"),
@@ -125,6 +129,7 @@ export async function updateCycle(formData: FormData) {
 }
 
 export async function toggleCycleStatus(formData: FormData) {
+  await requireAdminUser();
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status"));
 
@@ -144,6 +149,7 @@ export async function toggleCycleStatus(formData: FormData) {
 }
 
 export async function rotateShareToken(formData: FormData) {
+  await requireAdminUser();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
@@ -151,7 +157,10 @@ export async function rotateShareToken(formData: FormData) {
 
   await prisma.reportCycle.update({
     where: { id },
-    data: { shareTokenHash: shareToken.tokenHash },
+    data: {
+      shareToken: shareToken.token,
+      shareTokenHash: shareToken.tokenHash,
+    },
   });
 
   revalidatePath("/admin/cycles");

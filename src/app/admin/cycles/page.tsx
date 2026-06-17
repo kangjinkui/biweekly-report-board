@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarPlus,
   Eye,
+  ExternalLink,
   FileText,
   KeyRound,
   RotateCcw,
@@ -18,20 +19,24 @@ import {
 import { prisma } from "@/lib/prisma";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 import { PageShell } from "@/components/page-shell";
+import { CycleAdminTabs } from "./cycle-admin-tabs";
+import { requireAdminUser, type CurrentUser } from "@/lib/auth";
+import { DirectorShareLinkButton } from "./director-share-link";
 
-async function getCycles() {
+export const dynamic = "force-dynamic";
+
+async function getCycles(user: CurrentUser) {
   try {
     return {
       cycles: await prisma.reportCycle.findMany({
         orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
         include: {
           entries: {
-            orderBy: {
-              team: { displayOrder: "asc" },
-            },
-            include: {
-              team: true,
-            },
+            where:
+              user.role === "super_admin"
+                ? undefined
+                : { team: { departmentName: user.managedDepartmentName ?? "" } },
+            select: { id: true },
           },
         },
       }),
@@ -46,7 +51,8 @@ async function getCycles() {
 }
 
 export default async function CyclesPage() {
-  const { cycles, error } = await getCycles();
+  const user = await requireAdminUser();
+  const { cycles, error } = await getCycles(user);
 
   return (
     <PageShell
@@ -72,6 +78,8 @@ export default async function CyclesPage() {
         </>
       }
     >
+      <CycleAdminTabs active="settings" />
+
       <div className="mb-4 flex items-center justify-between">
         <h2 className="gov-section-title text-xl">회차 등록</h2>
         <button
@@ -177,6 +185,17 @@ export default async function CyclesPage() {
                     <Eye className="h-4 w-4" aria-hidden />
                     국장 보고
                   </Link>
+                  {cycle.shareToken ? (
+                    <Link
+                      href={`/share/director/${cycle.shareToken}`}
+                      target="_blank"
+                      className="gov-subtle-action inline-flex items-center gap-2 border px-3 py-2 text-sm"
+                    >
+                      <ExternalLink className="h-4 w-4" aria-hidden />
+                      공유 보기
+                    </Link>
+                  ) : null}
+                  <DirectorShareLinkButton shareToken={cycle.shareToken} />
                   <form action={toggleCycleStatus}>
                     <input type="hidden" name="id" value={cycle.id} />
                     <input type="hidden" name="status" value={cycle.status} />
@@ -195,25 +214,6 @@ export default async function CyclesPage() {
                 </div>
               </div>
 
-              {cycle.entries.length > 0 ? (
-                <div className="mt-4 border-t border-[#c8d3df] pt-4">
-                  <h3 className="gov-section-title text-sm">팀별 작성 링크</h3>
-                  <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    {cycle.entries.map((entry) => (
-                      <Link
-                        key={entry.id}
-                        href={`/write/${entry.teamId}/${cycle.id}`}
-                        className="flex items-center justify-between border border-[#c8d3df] bg-white px-3 py-2 text-sm hover:border-[#005bac]"
-                      >
-                        <span>{entry.team.name}</span>
-                        <span className="text-[#667085]">
-                          {entryStatusLabel(entry.status)}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </section>
           ))}
         </div>
@@ -335,16 +335,4 @@ function DateField({
 
 function formatDateInput(date: Date) {
   return date.toISOString().slice(0, 10);
-}
-
-function entryStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    not_started: "작성 전",
-    in_progress: "작성 중",
-    submitted: "제출 완료",
-    needs_revision: "수정 필요",
-    completed: "완료",
-  };
-
-  return labels[status] ?? status;
 }
