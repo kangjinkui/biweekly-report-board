@@ -25,12 +25,6 @@ export function TeamSelect({ teams }: { teams: TeamOption[] }) {
   const [teamId, setTeamId] = useState(filteredTeams[0]?.id ?? "");
 
   useEffect(() => {
-    if (!availableDepartmentNames.includes(departmentName)) {
-      setDepartmentName(availableDepartmentNames[0] ?? DEPARTMENT_NAMES[0]);
-    }
-  }, [availableDepartmentNames, departmentName]);
-
-  useEffect(() => {
     setTeamId(filteredTeams[0]?.id ?? "");
   }, [filteredTeams]);
 
@@ -43,10 +37,9 @@ export function TeamSelect({ teams }: { teams: TeamOption[] }) {
           value={departmentName}
           onChange={(event) => setDepartmentName(event.target.value as DepartmentName)}
           className="w-full border border-[#c8d3df] px-3 py-2"
-          disabled={availableDepartmentNames.length === 0}
         >
           {DEPARTMENT_NAMES.map((name) => (
-            <option key={name} value={name} disabled={!availableDepartmentNames.includes(name)}>
+            <option key={name} value={name}>
               {name}
             </option>
           ))}

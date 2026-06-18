@@ -11,3 +11,5 @@ coverage
 *.tsbuildinfo
 docs/*.pdf
 prisma/dev.db
+.bkit/
+.codex-git-tmp-*/
