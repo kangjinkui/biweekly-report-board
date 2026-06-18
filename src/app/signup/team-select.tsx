@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DEPARTMENT_NAMES, type DepartmentName } from "@/lib/organization";
 
 type TeamOption = {
@@ -10,12 +10,29 @@ type TeamOption = {
 };
 
 export function TeamSelect({ teams }: { teams: TeamOption[] }) {
-  const [departmentName, setDepartmentName] = useState<DepartmentName>(DEPARTMENT_NAMES[0]);
+  const availableDepartmentNames = useMemo(
+    () => DEPARTMENT_NAMES.filter((name) => teams.some((team) => team.departmentName === name)),
+    [teams],
+  );
+  const [departmentName, setDepartmentName] = useState<DepartmentName>(
+    availableDepartmentNames[0] ?? DEPARTMENT_NAMES[0],
+  );
 
   const filteredTeams = useMemo(
     () => teams.filter((team) => team.departmentName === departmentName),
     [departmentName, teams],
   );
+  const [teamId, setTeamId] = useState(filteredTeams[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!availableDepartmentNames.includes(departmentName)) {
+      setDepartmentName(availableDepartmentNames[0] ?? DEPARTMENT_NAMES[0]);
+    }
+  }, [availableDepartmentNames, departmentName]);
+
+  useEffect(() => {
+    setTeamId(filteredTeams[0]?.id ?? "");
+  }, [filteredTeams]);
 
   return (
     <>
@@ -26,9 +43,10 @@ export function TeamSelect({ teams }: { teams: TeamOption[] }) {
           value={departmentName}
           onChange={(event) => setDepartmentName(event.target.value as DepartmentName)}
           className="w-full border border-[#c8d3df] px-3 py-2"
+          disabled={availableDepartmentNames.length === 0}
         >
           {DEPARTMENT_NAMES.map((name) => (
-            <option key={name} value={name}>
+            <option key={name} value={name} disabled={!availableDepartmentNames.includes(name)}>
               {name}
             </option>
           ))}
@@ -36,7 +54,17 @@ export function TeamSelect({ teams }: { teams: TeamOption[] }) {
       </label>
       <label>
         <span className="mb-2 block text-sm font-semibold">팀</span>
-        <select name="teamId" className="w-full border border-[#c8d3df] px-3 py-2" required>
+        <select
+          name="teamId"
+          value={teamId}
+          onChange={(event) => setTeamId(event.target.value)}
+          className="w-full border border-[#c8d3df] px-3 py-2"
+          required
+          disabled={filteredTeams.length === 0}
+        >
+          {filteredTeams.length === 0 ? (
+            <option value="">등록된 활성 팀이 없습니다</option>
+          ) : null}
           {filteredTeams.map((team) => (
             <option key={team.id} value={team.id}>
               {team.name}
