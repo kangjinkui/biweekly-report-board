@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowUp,
   ClipboardCopy,
+  Pencil,
   Plus,
   Send,
   Trash2,
@@ -22,7 +23,11 @@ import { formatCyclePeriodSummary, formatKoreanDate } from "@/lib/report-cycle";
 import { PageShell } from "@/components/page-shell";
 import { ReportTwoColumnTable } from "@/components/report-two-column-table";
 import { WORK_ITEM_TYPE_LABELS, WORK_ITEM_TYPES } from "@/lib/work-items";
-import { canWriteTeam, requireApprovedUser, type CurrentUser } from "@/lib/auth";
+import {
+  canEditTeamReport,
+  requireApprovedUser,
+  type CurrentUser,
+} from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -43,9 +48,14 @@ export default async function WritePage({ params }: WritePageProps) {
   }
 
   const { team, cycle, entry, departmentEntries } = data;
-  const canEdit = canWriteTeam(user, teamId);
+  const canEdit = canEditTeamReport(user, team);
+  const isAdminUser = user.role === "super_admin" || user.role === "department_manager";
   const isSubmitted = entry.status === "submitted";
   const periodSummary = formatCyclePeriodSummary(cycle);
+  const otherDepartmentEntries = departmentEntries.filter(
+    (departmentEntry) => departmentEntry.teamId !== team.id,
+  );
+  const summaryEntries = isAdminUser ? otherDepartmentEntries : departmentEntries;
 
   return (
     <PageShell
@@ -63,15 +73,63 @@ export default async function WritePage({ params }: WritePageProps) {
       }
     >
       <Link
-        href={canEdit ? "/my" : "/admin"}
+        href={isAdminUser ? "/admin/cycles/links" : "/my"}
         className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#005bac]"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
-        {canEdit ? "내 업무보고" : "관리자 화면"}
+        {isAdminUser ? "작성 링크" : "내 업무보고"}
       </Link>
 
+      {isAdminUser ? (
+        <section className="mt-4 border border-[#c8d3df] bg-white">
+          <div className="border-b border-[#c8d3df] bg-[#f6f9fc] px-4 py-3">
+            <h2 className="font-semibold text-[#003f7d]">팀별 보고자료</h2>
+          </div>
+          <div className="grid gap-2 p-4 md:grid-cols-2">
+            {departmentEntries.map((departmentEntry) => {
+              const isSelected = departmentEntry.teamId === team.id;
+
+              return (
+                <Link
+                  key={departmentEntry.id}
+                  href={`/write/${departmentEntry.teamId}/${cycle.id}`}
+                  className={`flex items-center justify-between gap-3 border px-3 py-2 text-sm ${
+                    isSelected
+                      ? "border-[#005bac] bg-[#e8f1fa] font-semibold text-[#003f7d]"
+                      : "border-[#c8d3df] bg-white text-[#344054]"
+                  }`}
+                >
+                  <span>
+                    <span className="block">{departmentEntry.team.name}</span>
+                    <span className="mt-0.5 block text-xs text-[#667085]">
+                      {departmentEntry.workItems.length}개 항목
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs">
+                    <Pencil className="h-3.5 w-3.5" aria-hidden />
+                    {isSelected ? "편집 중" : "작성"}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="mt-6 border border-[#c8d3df] bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#c8d3df] bg-[#f6f9fc] px-4 py-3">
+          <div>
+            <h2 className="font-semibold text-[#102a43]">{team.name} 보고자료</h2>
+            <p className="mt-1 text-sm text-[#667085]">{team.departmentName}</p>
+          </div>
+          <span className="border border-[#c8d3df] bg-white px-3 py-1 text-sm text-[#344054]">
+            {entryStatusLabel(entry.status)}
+          </span>
+        </div>
+        <div className="p-4">
+
       {canEdit ? (
-        <section className="mt-6 flex flex-wrap gap-3">
+        <section className="flex flex-wrap gap-3">
           <form action={addWorkItem}>
             <HiddenContext entryId={entry.id} teamId={team.id} cycleId={cycle.id} />
             <div className="inline-flex flex-wrap gap-2">
@@ -178,6 +236,8 @@ export default async function WritePage({ params }: WritePageProps) {
           ))}
         </div>
       )}
+        </div>
+      </section>
 
       <section className="gov-panel mt-8 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#c8d3df] pb-4">
@@ -192,17 +252,17 @@ export default async function WritePage({ params }: WritePageProps) {
             </p>
           </div>
           <span className="border border-[#c8d3df] bg-white px-3 py-1 text-sm text-[#344054]">
-            {departmentEntries.length}개 팀
+            {summaryEntries.length}개 팀
           </span>
         </div>
 
-        {departmentEntries.length === 0 ? (
+        {summaryEntries.length === 0 ? (
           <p className="mt-5 border border-[#c8d3df] bg-white px-4 py-4 text-sm text-[#667085]">
             아직 같은 부서에서 작성 중인 보고가 없습니다.
           </p>
         ) : (
           <div className="mt-5 space-y-5">
-            {departmentEntries.map((departmentEntry) => (
+            {summaryEntries.map((departmentEntry) => (
               <section key={departmentEntry.id} className="border border-[#c8d3df] bg-white">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#c8d3df] bg-[#f6f9fc] px-4 py-3">
                   <div>
@@ -211,9 +271,20 @@ export default async function WritePage({ params }: WritePageProps) {
                       보고 항목 {departmentEntry.workItems.length}개
                     </p>
                   </div>
-                  <span className="border border-[#c8d3df] bg-white px-3 py-1 text-sm text-[#344054]">
-                    {entryStatusLabel(departmentEntry.status)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="border border-[#c8d3df] bg-white px-3 py-1 text-sm text-[#344054]">
+                      {entryStatusLabel(departmentEntry.status)}
+                    </span>
+                    {isAdminUser ? (
+                      <Link
+                        href={`/write/${departmentEntry.teamId}/${cycle.id}`}
+                        className="gov-action inline-flex items-center gap-1 px-3 py-1 text-sm font-semibold"
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                        작성
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
                 {departmentEntry.workItems.length === 0 ? (
                   <p className="px-4 py-4 text-sm text-[#667085]">
@@ -251,7 +322,7 @@ async function getWriteData(
     return null;
   }
 
-  const canEdit = canWriteTeam(user, teamId);
+  const canEdit = canEditTeamReport(user, team);
   const canViewDepartment =
     user.role === "super_admin" ||
     (user.role === "department_manager" &&

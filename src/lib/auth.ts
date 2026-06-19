@@ -10,7 +10,6 @@ import { createTokenPair, hashToken } from "@/lib/tokens";
 export const SESSION_COOKIE_NAME = "login_cookie_probe";
 export const LEGACY_SESSION_COOKIE_NAME = "biweekly_report_session";
 const SESSION_DAYS = 14;
-const SESSION_COOKIE_SECONDS = 5 * 60;
 export const SESSION_COOKIE_SECURE =
   process.env.SESSION_COOKIE_SECURE === "true" ||
   (process.env.SESSION_COOKIE_SECURE !== "false" &&
@@ -112,13 +111,13 @@ export async function createSessionToken(adminUserId: string) {
   return { token: token.token, expiresAt };
 }
 
-export function getSessionCookieOptions(expiresAt: Date) {
+export function getSessionCookieOptions(expiresAt: Date, secure = SESSION_COOKIE_SECURE) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: SESSION_COOKIE_SECURE,
+    secure,
     path: "/",
-    maxAge: SESSION_COOKIE_SECONDS,
+    expires: expiresAt,
   };
 }
 
@@ -126,7 +125,16 @@ export async function createSession(adminUserId: string) {
   const session = await createSessionToken(adminUserId);
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, session.token, getSessionCookieOptions(session.expiresAt));
+  const headerStore = await headers();
+  const forwardedProto = headerStore.get("x-forwarded-proto");
+  const secure =
+    process.env.SESSION_COOKIE_SECURE === "true" ||
+    (process.env.SESSION_COOKIE_SECURE !== "false" && forwardedProto === "https");
+  cookieStore.set(
+    SESSION_COOKIE_NAME,
+    session.token,
+    getSessionCookieOptions(session.expiresAt, secure),
+  );
 }
 
 export async function destroyCurrentSession() {
@@ -169,6 +177,15 @@ export async function requireApprovedUser() {
 
 export function canWriteTeam(user: Pick<AdminUser, "role" | "status" | "teamId">, teamId: string) {
   return user.status === "approved" && user.role === "team_user" && user.teamId === teamId;
+}
+
+export function canEditTeamReport(
+  user: Pick<AdminUser, "role" | "status" | "teamId" | "managedDepartmentName">,
+  team: Pick<Team, "id" | "departmentName">,
+) {
+  if (user.status !== "approved") return false;
+  if (canWriteTeam(user, team.id)) return true;
+  return isAdminRole(user.role) && canManageDepartment(user, team.departmentName);
 }
 
 export async function requireAdminUser() {

@@ -41,11 +41,11 @@ export async function POST(request: NextRequest) {
 
   const session = await createSessionToken(user.id);
   const redirectPath = user.role === "team_user" ? "/my" : "/admin";
-  const response = loginCompleteResponse(request, redirectPath);
+  const response = redirectTo(request, redirectPath);
   response.cookies.set(
     SESSION_COOKIE_NAME,
     session.token,
-    getSessionCookieOptions(session.expiresAt),
+    getSessionCookieOptions(session.expiresAt, isSecureRequest(request)),
   );
   response.cookies.delete(LEGACY_SESSION_COOKIE_NAME);
   console.info("[auth] login accepted", {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     role: user.role,
     status: user.status,
     redirect: getAbsoluteUrl(request, redirectPath),
-    cookieSecure: getSessionCookieOptions(session.expiresAt).secure,
+    cookieSecure: getSessionCookieOptions(session.expiresAt, isSecureRequest(request)).secure,
   });
 
   return response;
@@ -61,30 +61,6 @@ export async function POST(request: NextRequest) {
 
 function redirectTo(request: NextRequest, path: string) {
   return NextResponse.redirect(getAbsoluteUrl(request, path), 303);
-}
-
-function loginCompleteResponse(request: NextRequest, path: string) {
-  const url = getAbsoluteUrl(request, path);
-  return new NextResponse(
-    `<!doctype html>
-<html lang="ko">
-  <head>
-    <meta charset="utf-8" />
-    <title>로그인 완료</title>
-  </head>
-  <body>
-    <p>로그인 완료</p>
-    <p><a href="${escapeHtml(url)}">계속</a></p>
-  </body>
-</html>`,
-    {
-      status: 200,
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": "no-store",
-      },
-    },
-  );
 }
 
 function getAbsoluteUrl(request: NextRequest, path: string) {
@@ -100,10 +76,12 @@ function getAbsoluteUrl(request: NextRequest, path: string) {
   return `${protocol}://${host}${path}`;
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+function isSecureRequest(request: NextRequest) {
+  if (process.env.SESSION_COOKIE_SECURE === "true") return true;
+  if (process.env.SESSION_COOKIE_SECURE === "false") return false;
+
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  if (forwardedProto) return forwardedProto === "https";
+
+  return request.nextUrl.protocol === "https:";
 }

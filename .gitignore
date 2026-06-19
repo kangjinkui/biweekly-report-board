@@ -10,6 +10,7 @@ coverage
 *.log
 *.tsbuildinfo
 docs/*.pdf
+docs/*.hwpx
 prisma/dev.db
 .bkit/
 .codex-git-tmp-*/

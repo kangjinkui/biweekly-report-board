@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { normalizeWorkItemType, WORK_ITEM_TYPES } from "@/lib/work-items";
-import { canWriteTeam, requireApprovedUser } from "@/lib/auth";
+import { canEditTeamReport, requireApprovedUser } from "@/lib/auth";
 
 const workItemSchema = z.object({
   itemType: z.enum(WORK_ITEM_TYPES).default("both"),
@@ -304,12 +304,19 @@ function revalidateAdminPaths(cycleId: string) {
 
 async function canWriteEntry(entryId: string, teamId: string, cycleId: string) {
   const user = await requireApprovedUser();
-  if (!canWriteTeam(user, teamId)) return false;
 
   const entry = await prisma.reportEntry.findUnique({
     where: { id: entryId },
-    select: { teamId: true, reportCycleId: true },
+    select: {
+      teamId: true,
+      reportCycleId: true,
+      team: { select: { id: true, departmentName: true } },
+    },
   });
 
-  return entry?.teamId === teamId && entry.reportCycleId === cycleId;
+  return (
+    entry?.teamId === teamId &&
+    entry.reportCycleId === cycleId &&
+    canEditTeamReport(user, entry.team)
+  );
 }

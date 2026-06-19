@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { WORK_ITEM_TYPES } from "@/lib/work-items";
-import { canWriteTeam, getCurrentUser } from "@/lib/auth";
+import { canEditTeamReport, getCurrentUser } from "@/lib/auth";
 
 const updateWorkItemSchema = z.object({
   entryId: z.string().uuid(),
@@ -34,13 +34,22 @@ export async function PATCH(request: NextRequest, context: WorkItemRouteContext)
     );
   }
   const user = await getCurrentUser();
-  if (!user || !canWriteTeam(user, parsed.data.teamId)) {
+  if (!user || user.status !== "approved") {
     return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
 
   const item = await prisma.workItem.findUnique({
     where: { id: itemId },
-    select: { reportEntryId: true, entry: { select: { teamId: true, reportCycleId: true } } },
+    select: {
+      reportEntryId: true,
+      entry: {
+        select: {
+          teamId: true,
+          reportCycleId: true,
+          team: { select: { id: true, departmentName: true } },
+        },
+      },
+    },
   });
 
   if (
@@ -53,6 +62,10 @@ export async function PATCH(request: NextRequest, context: WorkItemRouteContext)
       { ok: false, message: "업무 항목을 찾을 수 없습니다." },
       { status: 404 },
     );
+  }
+
+  if (!canEditTeamReport(user, item.entry.team)) {
+    return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
 
   const [, entry] = await prisma.$transaction([
