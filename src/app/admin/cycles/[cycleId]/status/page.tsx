@@ -5,7 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { updateEntryStatus } from "./actions";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 import { PageShell } from "@/components/page-shell";
+import { TeamGaugeCard } from "@/components/gamification-widgets";
 import { requireAdminUser } from "@/lib/auth";
+import { buildTeamGauge } from "@/lib/gamification";
 import { compareReportEntriesByDepartmentOrder } from "@/lib/organization";
 
 type StatusPageProps = {
@@ -54,6 +56,7 @@ export default async function StatusPage({ params }: StatusPageProps) {
     ["submitted", "completed"].includes(entry.status),
   ).length;
   const periodSummary = formatCyclePeriodSummary(cycle);
+  const teamGauge = buildTeamGauge(entries);
 
   return (
     <PageShell
@@ -74,6 +77,10 @@ export default async function StatusPage({ params }: StatusPageProps) {
         </>
       }
     >
+      <div className="mb-5">
+        <TeamGaugeCard gauge={teamGauge} title="이번 회차 팀 제출 게이지" />
+      </div>
+
       <div className="mb-4 flex items-center justify-between">
         <h2 className="gov-section-title text-xl">팀별 제출 상태</h2>
       </div>

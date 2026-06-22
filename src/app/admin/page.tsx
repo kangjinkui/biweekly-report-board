@@ -13,7 +13,9 @@ import {
 import { prisma } from "@/lib/prisma";
 import { PageShell } from "@/components/page-shell";
 import { CopyLinkButton } from "@/components/copy-link-button";
+import { TeamGaugeCard } from "@/components/gamification-widgets";
 import { requireAdminUser, type CurrentUser } from "@/lib/auth";
+import { buildTeamGauge } from "@/lib/gamification";
 import { compareReportEntriesByDepartmentOrder } from "@/lib/organization";
 import { ensureDraftCycleEntriesForActiveTeams } from "@/lib/report-entries";
 
@@ -96,6 +98,7 @@ export default async function AdminPage() {
     ["submitted", "completed"].includes(entry.status),
   ).length;
   const totalEntries = entries.length;
+  const latestGauge = buildTeamGauge(entries);
 
   return (
     <PageShell
@@ -134,6 +137,12 @@ export default async function AdminPage() {
           </p>
         </div>
       </div>
+
+      {latestCycle ? (
+        <div className="mt-4">
+          <TeamGaugeCard gauge={latestGauge} title="현재 회차 팀 제출 게이지" />
+        </div>
+      ) : null}
 
       {dashboard.error ? (
         <div className="gov-panel mt-4 p-4 text-sm text-[#667085]">

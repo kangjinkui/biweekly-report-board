@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { LogOut, PencilLine } from "lucide-react";
 import { PageShell } from "@/components/page-shell";
+import { BadgeBoard, ReportLevelCard, TeamGaugeCard } from "@/components/gamification-widgets";
 import { canWriteTeam, requireCurrentUser, statusLabel } from "@/lib/auth";
+import { buildReportLevelProfile, buildTeamGauge } from "@/lib/gamification";
 import { prisma } from "@/lib/prisma";
 import { formatCyclePeriodSummary } from "@/lib/report-cycle";
 
@@ -9,16 +11,31 @@ export const dynamic = "force-dynamic";
 
 export default async function MyPage() {
   const user = await requireCurrentUser();
-  const entries = user.teamId
-    ? await prisma.reportEntry.findMany({
-        where: { teamId: user.teamId },
-        orderBy: [{ cycle: { startDate: "desc" } }, { createdAt: "desc" }],
-        include: {
-          cycle: true,
-          workItems: { select: { id: true } },
-        },
-      })
-    : [];
+  const [entries, latestDepartmentCycle] = user.teamId
+    ? await Promise.all([
+        prisma.reportEntry.findMany({
+          where: { teamId: user.teamId },
+          orderBy: [{ cycle: { startDate: "desc" } }, { createdAt: "desc" }],
+          include: {
+            cycle: true,
+            workItems: { select: { id: true } },
+          },
+        }),
+        prisma.reportCycle.findFirst({
+          orderBy: [{ status: "asc" }, { startDate: "desc" }, { createdAt: "desc" }],
+          include: {
+            entries: {
+              where: { team: { departmentName: user.team?.departmentName ?? "" } },
+              select: { status: true },
+            },
+          },
+        }),
+      ])
+    : [[], null];
+  const levelProfile = buildReportLevelProfile(entries);
+  const teamGauge = latestDepartmentCycle
+    ? buildTeamGauge(latestDepartmentCycle.entries)
+    : null;
 
   return (
     <PageShell
@@ -33,6 +50,14 @@ export default async function MyPage() {
         </form>
       }
     >
+      <ReportLevelCard profile={levelProfile} />
+      <BadgeBoard badges={levelProfile.badges} />
+      {teamGauge ? (
+        <div className="mb-5">
+          <TeamGaugeCard gauge={teamGauge} title="우리 부서 제출 게이지" />
+        </div>
+      ) : null}
+
       <section className="gov-panel mb-5 p-4">
         <p className="text-sm text-[#667085]">계정 상태</p>
         <p className="mt-1 text-xl font-semibold">{statusLabel(user.status)}</p>
